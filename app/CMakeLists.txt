@@ -6,10 +6,9 @@ target_include_directories("main" PUBLIC ${LIBRARY_INCLUDES})
 
 target_link_libraries(
     "main"
-    PUBLIC "LibFoo"
-           "LibBar"
-           log
-           argparse)
+    PUBLIC "LibBookManagement"
+           "LibLibraryManagement"
+           "LibMemberManagement")
 
 if(${ENABLE_WARNINGS})
     target_set_warnings(

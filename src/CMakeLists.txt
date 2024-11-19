@@ -1,2 +1,4 @@
-add_subdirectory(foo)
-add_subdirectory(bar)
+include_directories(include)
+add_subdirectory(bookManagement)
+add_subdirectory(memberManagement)
+add_subdirectory(libraryManagement)
