@@ -3,6 +3,7 @@
 
 #include "../include/structures.h"
 
+void reset_next_member_id(void);
 void init_member(Member *member, const char *name, const char *email);
 void deinit_member(Member *member);
 Member *create_member(const char *name, const char *email);

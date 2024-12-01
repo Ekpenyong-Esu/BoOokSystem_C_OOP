@@ -8,6 +8,10 @@
 
 static int next_member_id = 1;
 
+void reset_next_member_id(void) {
+    next_member_id = 1;
+}
+
 void init_member(Member *member, const char *name, const char *email)
 {
     if (!member)
@@ -35,11 +39,19 @@ void init_member(Member *member, const char *name, const char *email)
 
 void deinit_member(Member *member)
 {
-    (void)member; // Currently no dynamic memory to free
+    (void)member; // Unused parameter
+    // Currently no dynamic memory to free
 }
 
 Member *create_member(const char *name, const char *email)
 {
+    if (!name || !email)
+    {
+        fprintf(stderr, "Invalid name or email\n");
+        syslog(LOG_ERR, "Invalid name or email\n");
+        return NULL;
+    }
+
     Member *member = (Member *)malloc(sizeof(Member));
     if (!member)
     {

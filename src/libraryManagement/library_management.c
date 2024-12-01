@@ -93,7 +93,7 @@ void delete_library(Library *library)
         return;
     }
     deinit_library(library);
-    free(library);
+   // free(library);
 }
 
 int save_library_to_file(const Library *library, const char *filename)

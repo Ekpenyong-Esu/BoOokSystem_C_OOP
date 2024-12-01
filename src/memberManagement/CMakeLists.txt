@@ -1,5 +1,10 @@
-set(LIBRARY_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/member_management.c")
-set(LIBRARY_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/member_management.h")
+set(LIBRARY_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/member_management.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../bookManagement/book_management.c")
+
+set(LIBRARY_HEADERS
+    "${CMAKE_CURRENT_SOURCE_DIR}/member_management.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../bookManagement/book_management.h")
 set(LIBRARY_INCLUDES "./" "${CMAKE_BINARY_DIR}/configured_files/include")
 
 add_library("LibMemberManagement" STATIC ${LIBRARY_SOURCES} ${LIBRARY_HEADERS})

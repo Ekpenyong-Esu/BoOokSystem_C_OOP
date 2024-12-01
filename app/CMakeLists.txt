@@ -4,11 +4,8 @@ set(LIBRARY_INCLUDES "./" "${CMAKE_BINARY_DIR}/configured_files/include")
 add_executable("main" ${APP_SOURCES})
 target_include_directories("main" PUBLIC ${LIBRARY_INCLUDES})
 
-target_link_libraries(
-    "main"
-    PUBLIC "LibBookManagement"
-           "LibLibraryManagement"
-           "LibMemberManagement")
+target_link_libraries("main" PUBLIC "LibBookManagement" "LibLibraryManagement"
+                                    "LibMemberManagement")
 
 if(${ENABLE_WARNINGS})
     target_set_warnings(

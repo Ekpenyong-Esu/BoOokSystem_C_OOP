@@ -46,9 +46,7 @@ function(add_clang_format_target)
     endif()
     file(GLOB_RECURSE CMAKE_FILES_C "*/*.c")
     file(GLOB_RECURSE CMAKE_FILES_H "*/*.h")
-    set(CPP_FILES
-        ${CMAKE_FILES_C}
-        ${CMAKE_FILES_H})
+    set(CPP_FILES ${CMAKE_FILES_C} ${CMAKE_FILES_H})
     list(
         FILTER
         CPP_FILES
