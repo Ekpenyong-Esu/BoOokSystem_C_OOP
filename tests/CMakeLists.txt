@@ -1,18 +1,18 @@
-add_executable("UnitTestFoo" "test_foo.c")
-target_link_libraries("UnitTestFoo" PUBLIC "LibFoo")
-target_link_libraries("UnitTestFoo" PRIVATE unity)
+add_executable("UnitTestBookManage" "test_book_management.c")
+target_link_libraries("UnitTestBookManage" PUBLIC "LibBookManagement")
+target_link_libraries("UnitTestBookManage" PRIVATE unity)
 
 add_executable("UnitTestBar" "test_bar.c")
 target_link_libraries("UnitTestBar" PUBLIC "LibBar")
 target_link_libraries("UnitTestBar" PRIVATE unity)
 
-add_test(NAME "RunUnitTestFoo" COMMAND "UnitTestFoo")
+add_test(NAME "RunUnitTestBookManage" COMMAND "UnitTestBookManage")
 add_test(NAME "RunUnitTestBar" COMMAND "UnitTestBar")
 
 if(${ENABLE_WARNINGS})
     target_set_warnings(
         TARGET
-        "UnitTestFoo"
+        "UnitTestBookManage"
         ENABLE
         ${ENABLE_WARNINGS}
         AS_ERRORS
@@ -37,7 +37,7 @@ if(ENABLE_COVERAGE)
         "${PROJECT_SOURCE_DIR}/build/*"
         "/usr/include/*")
     set(COVERAGE_EXTRA_FLAGS)
-    set(COVERAGE_DEPENDENCIES "UnitTestFoo" "UnitTestBar")
+    set(COVERAGE_DEPENDENCIES "UnitTestBookManage" "UnitTestBar")
 
     setup_target_for_coverage_gcovr_html(
         NAME

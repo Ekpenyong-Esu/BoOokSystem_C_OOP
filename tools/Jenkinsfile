@@ -1,0 +1,254 @@
+// Jenkinsfile
+pipeline {
+    agent any
+    
+    environment {
+        // Tool paths and configurations
+        CMAKE_VERSION = 'cmake-3.26.0'
+        GCC_VERSION = 'gcc-12'
+        CPPCHECK_HOME = tool 'cppcheck'
+        CONAN_HOME = tool 'conan'
+        GCOV_HOME = tool 'gcov'
+        
+        // Build configuration
+        BUILD_TYPE = 'Release'
+        BUILD_DIR = 'build'
+        TEST_DIR = 'tests'
+        
+        // Artifact settings
+        ARTIFACT_NAME = 'myapp'
+        DEPLOY_DIR = '/opt/applications'
+        
+        // Code coverage thresholds
+        COVERAGE_THRESHOLD = '80'
+        
+        // SonarQube configuration
+        SONAR_PROJECT_KEY = 'cpp-project'
+    }
+    
+    parameters {
+        choice(name: 'BUILD_TYPE', choices: ['Debug', 'Release'], description: 'Build configuration type')
+        booleanParam(name: 'RUN_TESTS', defaultValue: true, description: 'Run unit tests')
+        booleanParam(name: 'STATIC_ANALYSIS', defaultValue: true, description: 'Run static code analysis')
+        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to build')
+    }
+    
+    options {
+        timestamps()
+        timeout(time: 1, unit: 'HOURS')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                sh 'git checkout ${BRANCH_NAME}'
+            }
+        }
+        
+        stage('Setup Build Environment') {
+            steps {
+                script {
+                    // Install dependencies using Conan
+                    sh """
+                        ${CONAN_HOME}/bin/conan install . \
+                            --output-folder=${BUILD_DIR} \
+                            --build=missing \
+                            -s build_type=${params.BUILD_TYPE}
+                    """
+                    
+                    // Create build directory and run CMake
+                    sh """
+                        mkdir -p ${BUILD_DIR}
+                        cd ${BUILD_DIR}
+                        ${CMAKE_VERSION}/bin/cmake .. \
+                            -DCMAKE_BUILD_TYPE=${params.BUILD_TYPE} \
+                            -DCMAKE_CXX_COMPILER=g++-12 \
+                            -DCMAKE_C_COMPILER=gcc-12 \
+                            -DENABLE_TESTING=ON \
+                            -DENABLE_COVERAGE=ON
+                    """
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh """
+                    cd ${BUILD_DIR}
+                    make -j\$(nproc)
+                """
+            }
+        }
+        
+        stage('Unit Tests') {
+            when {
+                expression { params.RUN_TESTS }
+            }
+            steps {
+                sh """
+                    cd ${BUILD_DIR}
+                    ctest --output-on-failure --verbose
+                """
+            }
+            post {
+                always {
+                    // Process test results
+                    xunit (
+                        thresholds: [
+                            skipped(failureThreshold: '0'),
+                            failed(failureThreshold: '0')
+                        ],
+                        tools: [
+                            CTest(
+                                pattern: '${BUILD_DIR}/Testing/**/*.xml',
+                                deleteOutputFiles: true,
+                                stopProcessingIfError: true
+                            )
+                        ]
+                    )
+                    
+                    // Generate and publish code coverage
+                    sh """
+                        cd ${BUILD_DIR}
+                        ${GCOV_HOME}/bin/gcovr -r .. \
+                            --html --html-details \
+                            -o coverage_report.html \
+                            --exclude-directories='${TEST_DIR}'
+                    """
+                    
+                    publishHTML(
+                        target: [
+                            allowMissing: false,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true,
+                            reportDir: '${BUILD_DIR}',
+                            reportFiles: 'coverage_report.html',
+                            reportName: 'Code Coverage Report'
+                        ]
+                    )
+                }
+            }
+        }
+        
+        stage('Static Analysis') {
+            when {
+                expression { params.STATIC_ANALYSIS }
+            }
+            parallel {
+                stage('Cppcheck') {
+                    steps {
+                        sh """
+                            ${CPPCHECK_HOME}/bin/cppcheck \
+                                --enable=all \
+                                --inconclusive \
+                                --xml \
+                                --output-file=cppcheck_report.xml \
+                                .
+                        """
+                        
+                        publishCppcheck(
+                            pattern: 'cppcheck_report.xml',
+                            ignoreBlankFiles: false
+                        )
+                    }
+                }
+                
+                stage('SonarQube Analysis') {
+                    steps {
+                        withSonarQubeEnv('SonarQube') {
+                            sh """
+                                sonar-scanner \
+                                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                                    -Dsonar.sources=src \
+                                    -Dsonar.tests=${TEST_DIR} \
+                                    -Dsonar.cpp.file.suffixes=.cpp,.h \
+                                    -Dsonar.cpp.cppcheck.reportPath=cppcheck_report.xml \
+                                    -Dsonar.coverage.exclusions=**/${TEST_DIR}/**
+                            """
+                        }
+                        
+                        timeout(time: 10, unit: 'MINUTES') {
+                            waitForQualityGate abortPipeline: true
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Package') {
+            steps {
+                sh """
+                    cd ${BUILD_DIR}
+                    cpack -G DEB
+                """
+                
+                archiveArtifacts(
+                    artifacts: "${BUILD_DIR}/*.deb",
+                    fingerprint: true
+                )
+            }
+        }
+        
+        stage('Deploy') {
+            when {
+                expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') }
+            }
+            steps {
+                script {
+
+                    def deployScript = "scripts/deploy-${params.BUILD_TYPE.toLowerCase()}.sh"
+                    
+                    if (fileExists(deployScript)) {
+                        sh """
+                            chmod +x ${deployScript}
+                            ./${deployScript} ${BUILD_DIR}/*.deb ${DEPLOY_DIR}
+                        """
+                    } else {
+                        error "Deployment script ${deployScript} not found!"
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            // Clean workspace
+            cleanWs()
+        }
+        
+        success {
+            emailext (
+                subject: "Pipeline '${currentBuild.fullDisplayName}' Successful",
+                body: """
+                    Build completed successfully:
+                    Build URL: ${env.BUILD_URL}
+                    Build Type: ${params.BUILD_TYPE}
+                    Branch: ${params.BRANCH_NAME}
+                """,
+                recipientProviders: [[$class: 'DevelopersRecipientProvider']]
+            )
+        }
+        
+        failure {
+            emailext (
+                subject: "Pipeline '${currentBuild.fullDisplayName}' Failed",
+                body: """
+                    Build failed:
+                    Build URL: ${env.BUILD_URL}
+                    Build Type: ${params.BUILD_TYPE}
+                    Branch: ${params.BRANCH_NAME}
+                    
+                    Please check the build logs for details.
+                """,
+                recipientProviders: [
+                    [$class: 'DevelopersRecipientProvider'],
+                    [$class: 'RequesterRecipientProvider']
+                ]
+            )
+        }
+    }
+}

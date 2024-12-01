@@ -4,6 +4,8 @@
 
 #include "../include/structures.h"
 
+void reset_book_id(void);
+
 void init_book(Book *book,
                const char *title,
                const char *author,

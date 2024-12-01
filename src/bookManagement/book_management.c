@@ -6,6 +6,10 @@
 
 static int next_book_id = 1;
 
+void reset_book_id(void) {
+    next_book_id = 1;
+}
+
 void init_book(Book *book,
                const char *title,
                const char *author,
@@ -165,10 +169,10 @@ Book *find_book_by_id(Library *library, int ident)
 
 void remove_book_from_library(Library *library, int ident)
 {
-    if (!library)
+    if (!library || !library->books || library->num_books <= 0)
     {
-        fprintf(stderr, "Library pointer is NULL\n");
-        syslog(LOG_ERR, "Library pointer is NULL\n");
+        fprintf(stderr, "Invalid library state\n");
+        syslog(LOG_ERR, "Invalid library state\n");
         return;
     }
 
@@ -178,19 +182,21 @@ void remove_book_from_library(Library *library, int ident)
         if (library->books[i].ident == ident)
         {
             found_index = i;
-            syslog(LOG_INFO, "Removed book with ID: %d\n", ident);
+            syslog(LOG_INFO, "Removing book with ID: %d\n", ident);
             break;
         }
     }
 
-    if (found_index != -1)
+    if (found_index != -1 && found_index < library->num_books)
     {
-        delete_book(&library->books[found_index]);
-
+        // Shift remaining elements
         for (int i = found_index; i < library->num_books - 1; i++)
         {
             library->books[i] = library->books[i + 1];
         }
+
+        // Clear last element
+        memset(&library->books[library->num_books - 1], 0, sizeof(Book));
         library->num_books--;
     }
 }
